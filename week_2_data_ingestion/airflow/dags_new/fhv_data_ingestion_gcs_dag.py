@@ -19,6 +19,7 @@ AIRFLOW_HOME = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
 dataset_file = "fhv_tripdata_{{ execution_date.strftime('%Y-%m') }}.parquet"
 dataset_url = f"https://d37ci6vzurychx.cloudfront.net/trip-data/{dataset_file}"
 
+gcs_location = "fhv_tripdata/{{ execution_date.strftime('%Y') }}/" + dataset_file
 
 #BIGQUERY_DATASET = os.environ.get("BIGQUERY_DATASET", 'trips_data_all')
 
@@ -33,11 +34,6 @@ def upload_to_gcs(bucket, object_name, local_file):
     :param local_file: source path & file-name
     :return:
     """
-    # WORKAROUND to prevent timeout for files > 6 MB on 800 kbps upload speed.
-    # (Ref: https://github.com/googleapis/python-storage/issues/74)
-    storage.blob._MAX_MULTIPART_SIZE = 5 * 1024 * 1024  # 5 MB
-    storage.blob._DEFAULT_CHUNKSIZE = 5 * 1024 * 1024  # 5 MB
-    # End of Workaround
 
     client = storage.Client()
     bucket = client.bucket(bucket)
@@ -74,11 +70,15 @@ with DAG(
         python_callable=upload_to_gcs,
         op_kwargs={
             "bucket": BUCKET,
-            "object_name": f"raw/{dataset_file}",
+            "object_name": f"raw/{gcs_location}",
             "local_file": f"{AIRFLOW_HOME}/{dataset_file}",
         },
     )
 
+    rm_local_file = BashOperator(
+        task_id="rm_local_file",
+        bash_command=f"rm {AIRFLOW_HOME}/{dataset_file}"
+    )
 
+    download_dataset_task >> local_to_gcs_task >> rm_local_file
 
-    download_dataset_task >> local_to_gcs_task
