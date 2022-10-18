@@ -52,7 +52,7 @@ default_args = {
 
 # NOTE: DAG declaration - using a Context Manager (an implicit way)
 with DAG(
-    dag_id="taxi_data_ingestion_gcs_dag",
+    dag_id="yellow_taxi_data_ingestion_gcs_dag",
     schedule_interval="0 6 2 * *",
     default_args=default_args,
     max_active_runs=3,
